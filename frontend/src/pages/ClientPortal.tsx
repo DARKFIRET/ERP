@@ -92,9 +92,9 @@ export default function ClientPortal() {
 
     const isSlotOccupied = (slotId: number) => {
         if (!date || selectedTableId === '') return false;
-        return bookings.some(booking => 
-            booking.table_id === selectedTableId && 
-            booking.booking_date === date && 
+        return bookings.some(booking =>
+            booking.table_id === selectedTableId &&
+            booking.booking_date === date &&
             booking.slots.some(s => s.id === slotId)
         );
     };
@@ -149,7 +149,7 @@ export default function ClientPortal() {
     return (
         <Container maxWidth="md" sx={{ py: 4 }}>
             <Box textAlign="center" mb={4}>
-                <Typography variant="h3" component="h1" fontWeight="bold" color="primary">Jules</Typography>
+                <Typography variant="h3" component="h1" fontWeight="bold" color="primary">ERP</Typography>
                 <Typography variant="subtitle1" color="text.secondary">Ресторан & Кафе</Typography>
             </Box>
 
@@ -158,17 +158,17 @@ export default function ClientPortal() {
             )}
 
             {view === 'dashboard' && (
-                <ClientDashboard 
-                    history={history} 
-                    historyTab={historyTab} 
-                    setHistoryTab={setHistoryTab} 
+                <ClientDashboard
+                    history={history}
+                    historyTab={historyTab}
+                    setHistoryTab={setHistoryTab}
                     onNewBooking={() => { setSelectedTableId(''); setSelectedSlotIds([]); setCart({}); setView('booking'); }}
                     onLogout={handleLogout}
                 />
             )}
 
             {view === 'booking' && (
-                <ClientBooking 
+                <ClientBooking
                     guestName={guestName} setGuestName={setGuestName} phone={phone}
                     date={date} setDate={setDate} pax={pax} setPax={setPax}
                     tables={tables} selectedTableId={selectedTableId} setSelectedTableId={setSelectedTableId}
@@ -178,7 +178,7 @@ export default function ClientPortal() {
             )}
 
             {view === 'ordering' && (
-                <ClientOrdering 
+                <ClientOrdering
                     menu={menu} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart}
                     getCartTotal={getCartTotal} onSubmit={handleOrderSubmit}
                     onSkip={() => { showNotification("Ждем вас в гости!", "success"); setTimeout(() => { loadClientHistory(phone); setView('dashboard'); }, 2000); }}

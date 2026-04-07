@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { Box, Paper, TextField, Button, Typography, Container } from '@mui/material';
+import { Box, Paper, TextField, Button, Typography, Container, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 
 const LoginPage = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const { login } = useAuth();
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         try {
             const res = await fetch('http://localhost:3000/login', {
                 method: 'POST',
@@ -19,7 +21,7 @@ const LoginPage = () => {
             });
 
             if (!res.ok) {
-                alert('Неверный логин или пароль');
+                setError('Неверный логин или пароль');
                 return;
             }
 
@@ -36,7 +38,7 @@ const LoginPage = () => {
             }
         } catch (err) {
             console.error(err);
-            alert('Ошибка входа');
+            setError('Ошибка входа. Проверьте подключение к серверу.');
         }
     };
 
@@ -47,6 +49,11 @@ const LoginPage = () => {
                     Вход в систему
                 </Typography>
                 <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+                    {error && (
+                        <Alert severity="error" sx={{ mb: 2 }}>
+                            {error}
+                        </Alert>
+                    )}
                     <TextField
                         margin="normal"
                         required

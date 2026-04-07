@@ -35,7 +35,6 @@ import {
   Users,
   Search,
   Upload,
-  BarChart2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { MenuItemData } from "../types";

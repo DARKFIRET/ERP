@@ -8,7 +8,7 @@ export const auth = async (c: Context<{ Variables: Variables }>, next: Next) => 
     const authHeader = c.req.header('Authorization');
     if (!authHeader) return c.json({ error: 'Unauthorized' }, 401);
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1]!;
     try {
         const payload = jwt.verify(token, JWT_SECRET) as any;
         c.set('user', payload);

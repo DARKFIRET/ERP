@@ -4,7 +4,7 @@ import {
     TableContainer, TableHead, TableRow, IconButton, Dialog,
     DialogTitle, DialogContent, DialogActions, TextField, MenuItem,
     Select, FormControl, InputLabel, Tabs, Tab, Card, Chip,
-    Snackbar, Alert, Stack, Grid, InputAdornment
+    Snackbar, Alert, Grid, InputAdornment
 } from '@mui/material';
 import { Trash2, Plus, Calendar, User as UserIcon, Clock, Lock, Briefcase, Contact } from 'lucide-react';
 import { useAuth } from '../auth';

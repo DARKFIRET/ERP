@@ -16,7 +16,6 @@ import {
   Avatar,
   useTheme,
   Stack,
-  Tooltip,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
