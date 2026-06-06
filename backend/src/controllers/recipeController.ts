@@ -73,8 +73,15 @@ export const getMenuAvailability = async (c: Context) => {
         const map: Record<number, number> = {};
         for (const row of res.rows) {
             const id = row.menu_item_id;
-            const deductPerPortion = convertToStockUnit(Number(row.quantity), row.recipe_unit, row.stock_unit);
-            const portions = deductPerPortion > 0 ? Math.floor(Number(row.current_stock) / deductPerPortion) : 0;
+            let portions = 0;
+            try {
+                const deductPerPortion = convertToStockUnit(Number(row.quantity), row.recipe_unit, row.stock_unit);
+                portions = deductPerPortion > 0 ? Math.floor(Number(row.current_stock) / deductPerPortion) : 0;
+            } catch (err) {
+                console.warn(`Unit conversion error for menu item ${id} ingredient ${row.ingredient_name || ''}:`, err);
+                portions = 0;
+            }
+            
             if (map[id] === undefined || portions < (map[id] ?? 0)) {
                 map[id] = portions;
             }
@@ -85,7 +92,8 @@ export const getMenuAvailability = async (c: Context) => {
             availability[Number(id)] = { can_order: portions > 0, portions_available: portions };
         }
         return c.json(availability);
-    } catch {
+    } catch (err) {
+        console.error('getMenuAvailability error:', err);
         return c.json({ error: 'Failed to fetch availability' }, 500);
     }
 };
