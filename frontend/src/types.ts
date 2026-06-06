@@ -13,6 +13,7 @@ export interface TableData {
   today_bookings?: {
       time: string;
       guest_name: string;
+      booking_id: number;
   }[];
 }
 
@@ -63,4 +64,47 @@ export interface OrderData {
   status: string;
   total: number;
   items: OrderItem[];
+}
+
+export interface Ingredient {
+  id: number;
+  name: string;
+  unit: string;
+  cost_price: number;
+  current_stock: number;
+  min_stock: number;
+  low_stock: boolean;
+}
+
+export interface RecipeItem {
+  ingredient_id: number;
+  ingredient_name: string;
+  stock_unit: string;
+  recipe_unit: string;
+  quantity: number;
+}
+
+export interface MenuAvailability {
+  [menuItemId: number]: { can_order: boolean; portions_available: number };
+}
+
+export interface StockMovement {
+  id: number;
+  ingredient_id: number;
+  ingredient_name: string;
+  unit: string;
+  type: 'purchase' | 'usage' | 'waste' | 'adjustment';
+  quantity: number;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface MarginItem {
+  name: string;
+  category: string;
+  sold: number;
+  revenue: number;
+  total_cost: number;
+  margin_rub: number;
+  margin_pct: number;
 }

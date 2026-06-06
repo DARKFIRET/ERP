@@ -51,7 +51,7 @@ const BookingList = ({ refreshTrigger, onAddBooking, onRefresh }: BookingListPro
           InputLabelProps={{ shrink: true }}
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          sx={{ bgcolor: 'white' }}
+          sx={{}}
         />
       </Box>
 
@@ -60,7 +60,7 @@ const BookingList = ({ refreshTrigger, onAddBooking, onRefresh }: BookingListPro
           filteredBookings.map((booking) => (
             <Card
               key={booking.id}
-              sx={{ mb: 2, bgcolor: '#fafafa', cursor: 'pointer', '&:hover': { bgcolor: '#f0f0f0' } }}
+              sx={{ mb: 2, bgcolor: 'background.paper', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
               onClick={() => setSelectedBooking(booking)}
             >
               <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -86,17 +86,13 @@ const BookingList = ({ refreshTrigger, onAddBooking, onRefresh }: BookingListPro
         )}
       </Box>
 
-      <Box sx={{ p: 2, borderTop: '1px solid #e0e0e0' }}>
+      <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button
           variant="contained"
           fullWidth
           size="large"
           onClick={onAddBooking}
-          sx={{
-            bgcolor: '#1565c0',
-            textTransform: 'none',
-            fontSize: '1rem'
-          }}
+          sx={{ textTransform: 'none', fontSize: '1rem' }}
         >
           Добавить бронь
         </Button>

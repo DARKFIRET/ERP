@@ -3,7 +3,8 @@ import { query } from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET environment variable is required');
 
 export const login = async (c: Context) => {
     const { username, password } = await c.req.json();
@@ -32,7 +33,6 @@ export const login = async (c: Context) => {
 export const getRoles = async (c: Context) => {
     try {
         const res = await query('SELECT id, name FROM roles ORDER BY name');
-        console.log('Fetched roles:', res.rows);
         return c.json(res.rows);
     } catch (err) {
         console.error('Error fetching roles:', err);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Drawer,
@@ -26,18 +26,15 @@ import {
   LogOut,
   ChevronRight,
   BarChart2,
+  Package,
+  Settings,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth";
+import { roleTranslations } from "../utils/constants";
+import { useThemeSettings } from "../contexts/ThemeSettingsContext";
 
 const drawerWidth = 260;
-
-const roleTranslations: Record<string, string> = {
-  admin: "Администратор",
-  waiter: "Официант",
-  cook: "Повар",
-  manager: "Менеджер",
-};
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -45,6 +42,14 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const { role, logout, username } = useAuth();
   const theme = useTheme();
+  const { settings } = useThemeSettings();
+
+  const appInitials = settings.appName
+    .split(' ')
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase() || 'E';
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -81,10 +86,23 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       path: "/management/statistics",
       roles: ["manager"],
     },
+    {
+      text: "Склад",
+      icon: <Package size={22} />,
+      path: "/management/inventory",
+      roles: ["manager"],
+    },
+    {
+      text: "Настройки",
+      icon: <Settings size={22} />,
+      path: "/management/settings",
+      roles: ["manager"],
+    },
   ];
 
-  const filteredMenuItems = menuItems.filter((item) =>
-    item.roles.includes(role || "")
+  const filteredMenuItems = useMemo(
+    () => menuItems.filter((item) => item.roles.includes(role || "")),
+    [role]
   );
 
   const drawer = (
@@ -107,14 +125,16 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         }}
       >
         <Avatar
+          src={settings.iconDataUrl ?? undefined}
           sx={{
             bgcolor: "primary.main",
             width: 40,
             height: 40,
             fontWeight: "bold",
+            fontSize: "0.7rem",
           }}
         >
-          ERP
+          {!settings.iconDataUrl && appInitials}
         </Avatar>
         <Typography
           variant="h6"
@@ -126,7 +146,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             letterSpacing: "-0.5px",
           }}
         >
-          Кафе ERP
+          {settings.appName}
         </Typography>
       </Toolbar>
 
@@ -255,8 +275,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         position="fixed"
         elevation={0}
         sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
+          width: { xl: `calc(100% - ${drawerWidth}px)` },
+          ml: { xl: `${drawerWidth}px` },
           bgcolor: "background.default",
           color: "text.primary",
           borderBottom: "1px solid",
@@ -269,7 +289,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: "none" } }}
+            sx={{ mr: 2, display: { xl: "none" } }}
           >
             <MenuIcon />
           </IconButton>
@@ -287,7 +307,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       </AppBar>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        sx={{ width: { xl: drawerWidth }, flexShrink: { xl: 0 } }}
       >
         <Drawer
           variant="temporary"
@@ -297,7 +317,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
             keepMounted: true, // Better open performance on mobile.
           }}
           sx={{
-            display: { xs: "block", sm: "none" },
+            display: { xs: "block", xl: "none" },
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
               width: drawerWidth,
@@ -311,7 +331,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: "none", sm: "block" },
+            display: { xs: "none", xl: "block" },
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
               width: drawerWidth,
@@ -330,7 +350,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         sx={{
           flexGrow: 1,
           p: isWaiterInterface ? 0 : { xs: 2, sm: 3, md: 4 }, // Responsive padding
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          width: { xl: `calc(100% - ${drawerWidth}px)` },
           backgroundColor: "background.default",
           minHeight: "100vh",
           display: "flex",

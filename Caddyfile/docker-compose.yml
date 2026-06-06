@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    container_name: cafe_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cafe
+      POSTGRES_PASSWORD: cafe_password
+      POSTGRES_DB: cafe_erp
+    ports:
+      - "5432:5432" # Пробросил порт, чтобы вы могли подключиться с вашего ПК
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafe -d cafe_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

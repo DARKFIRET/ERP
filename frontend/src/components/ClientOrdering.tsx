@@ -1,9 +1,10 @@
-import { Box, Typography, Divider, Grid, List, ListItem, ListItemText, ListItemSecondaryAction, Button, IconButton, Card, CardContent } from '@mui/material';
+import { Box, Typography, Divider, Grid, List, ListItem, ListItemText, Button, Card, CardContent, IconButton, Chip } from '@mui/material';
 import { Plus as AddIcon, Minus as RemoveIcon, CheckCircle as CheckCircleIcon } from 'lucide-react';
-import type { MenuItemData } from '../types';
+import type { MenuItemData, MenuAvailability } from '../types';
 
 interface ClientOrderingProps {
     menu: MenuItemData[];
+    availability: MenuAvailability;
     cart: { [id: number]: number };
     addToCart: (itemId: number) => void;
     removeFromCart: (itemId: number) => void;
@@ -13,7 +14,7 @@ interface ClientOrderingProps {
 }
 
 export const ClientOrdering = ({
-    menu, cart, addToCart, removeFromCart, getCartTotal, onSubmit, onSkip
+    menu, availability, cart, addToCart, removeFromCart, getCartTotal, onSubmit, onSkip
 }: ClientOrderingProps) => (
     <Card elevation={3}>
         <CardContent sx={{ p: 4 }}>
@@ -30,15 +31,26 @@ export const ClientOrdering = ({
                 <Grid item xs={12} md={7}>
                     <Typography variant="h6" gutterBottom>Меню</Typography>
                     <List>
-                        {menu.map((item) => (
-                            <ListItem key={item.id} divider sx={{ px: 0 }}>
-                                {item.image_url && <Box component="img" src={`http://localhost:3000${item.image_url}`} sx={{ width: 60, height: 60, borderRadius: 1, objectFit: 'cover', mr: 2 }} />}
-                                <ListItemText primary={<Typography fontWeight="medium">{item.name}</Typography>} secondary={<Typography color="primary" fontWeight="bold">{item.price} ₽</Typography>} />
-                                <ListItemSecondaryAction>
-                                    <Button variant="outlined" size="small" onClick={() => addToCart(item.id)} startIcon={<AddIcon size={16} />}>Добавить</Button>
-                                </ListItemSecondaryAction>
-                            </ListItem>
-                        ))}
+                        {menu.map((item) => {
+                            const avail = availability[item.id];
+                            const canOrder = avail === undefined || avail.can_order;
+                            return (
+                                <ListItem key={item.id} divider sx={{ px: 0, gap: 2, alignItems: 'center', opacity: canOrder ? 1 : 0.6 }}>
+                                    {item.image_url && <Box component="img" src={`${item.image_url}`} sx={{ width: 60, height: 60, borderRadius: 1, objectFit: 'cover', flexShrink: 0 }} />}
+                                    <ListItemText 
+                                        primary={<Typography fontWeight="medium">{item.name}</Typography>} 
+                                        secondary={
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <Typography color="primary" fontWeight="bold">{item.price} ₽</Typography>
+                                                {!canOrder && <Chip label="Временно недоступно" color="error" size="small" />}
+                                            </Box>
+                                        } 
+                                        sx={{ m: 0 }} 
+                                    />
+                                    <Button variant="outlined" size="small" disabled={!canOrder} onClick={() => addToCart(item.id)} startIcon={<AddIcon size={16} />} sx={{ flexShrink: 0 }}>Добавить</Button>
+                                </ListItem>
+                            );
+                        })}
                     </List>
                 </Grid>
                 

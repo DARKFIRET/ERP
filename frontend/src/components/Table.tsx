@@ -1,6 +1,7 @@
-import { Paper, Typography, Box } from '@mui/material';
+import { Paper, Typography, Box, useTheme } from '@mui/material';
 import { Clock } from 'lucide-react';
 import type { TableData } from '../types';
+import { tableStatusColor, tableStatusLabel } from '../utils/statusHelpers';
 
 interface TableProps {
   table: TableData;
@@ -8,30 +9,12 @@ interface TableProps {
 }
 
 const Table = ({ table, onClick }: TableProps) => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'free': return '#43a047'; // Green
-      case 'occupied': return '#e53935'; // Red
-      case 'reserved': return '#fb8c00'; // Orange
-      case 'dirty': return '#757575'; // Grey
-      default: return '#bdbdbd';
-    }
-  };
+  const theme = useTheme();
+  const getStatusColor = (status: string) => tableStatusColor[status] ?? '#bdbdbd';
+  const getStatusText = (status: string) => tableStatusLabel[status] ?? '';
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'free': return 'Свободен';
-      case 'occupied': return 'Занят';
-      case 'reserved': return 'Забронирован';
-      case 'dirty': return 'Грязный';
-      default: return '';
-    }
-  };
-
-  // Determine shape based on seats (e.g., 2 seats -> small circle/square, 4 seats -> square/circle, 6+ seats -> rectangle)
-  // But to make them "look like tables", let's make them circular or rounded rectangles.
   const isRound = table.seats <= 4;
-  const chairColor = '#e0e0e0';
+  const chairColor = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.15)' : '#e0e0e0';
 
   const renderChairs = () => {
     const chairs = [];

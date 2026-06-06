@@ -6,6 +6,8 @@ import KitchenInterface from './pages/KitchenInterface';
 import ManagementInterface from './pages/ManagementInterface';
 import Statistics from './pages/Statistics';
 import UserManagement from './pages/UserManagement';
+import InventoryPage from './pages/InventoryPage';
+import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import ClientPortal from './pages/ClientPortal';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -35,6 +37,8 @@ function App() {
             <Route path="/management" element={<Layout><ManagementInterface /></Layout>} />
             <Route path="/management/users" element={<Layout><UserManagement /></Layout>} />
             <Route path="/management/statistics" element={<Layout><Statistics /></Layout>} />
+            <Route path="/management/inventory" element={<Layout><InventoryPage /></Layout>} />
+            <Route path="/management/settings" element={<Layout><SettingsPage /></Layout>} />
           </Route>
 
           <Route path="/" element={<Navigate to="/login" replace />} />

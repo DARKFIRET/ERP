@@ -1,6 +1,37 @@
 import type { Context } from 'hono';
 import { query } from '../config/db.js';
 
+// In-memory OTP store: phone -> { code, expires }
+const otpStore = new Map<string, { code: string; expires: number }>();
+
+export const sendOtp = async (c: Context) => {
+    const { phone } = await c.req.json<{ phone: string }>();
+    if (!phone) return c.json({ error: 'Phone is required' }, 400);
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(phone, { code, expires: Date.now() + 5 * 60 * 1000 });
+
+    // TODO: wire up real SMS provider here
+    console.log(`[OTP] ${phone} → ${code}`);
+
+    return c.json({ success: true, code });
+};
+
+export const verifyOtp = async (c: Context) => {
+    const { phone, code } = await c.req.json<{ phone: string; code: string }>();
+    if (!phone || !code) return c.json({ error: 'Phone and code are required' }, 400);
+
+    const entry = otpStore.get(phone);
+    if (!entry || Date.now() > entry.expires) {
+        otpStore.delete(phone);
+        return c.json({ error: 'Code expired' }, 400);
+    }
+    if (entry.code !== code) return c.json({ error: 'Invalid code' }, 400);
+
+    otpStore.delete(phone);
+    return c.json({ success: true });
+};
+
 export const getClientHistory = async (c: Context) => {
     const phone = c.req.query('phone');
     if (!phone) {

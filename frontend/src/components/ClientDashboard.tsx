@@ -1,5 +1,6 @@
 import { Box, Typography, Button, Card, CardContent, Tabs, Tab, List, ListItem, ListItemText, Chip } from '@mui/material';
 import { LogOut as LogOutIcon, Calendar as CalendarIcon } from 'lucide-react';
+import { orderStatusLabel } from '../utils/statusHelpers';
 
 interface ClientDashboardProps {
     history: { guestName: string; bookings: any[]; orders: any[] };
@@ -8,16 +9,6 @@ interface ClientDashboardProps {
     onNewBooking: () => void;
     onLogout: () => void;
 }
-
-const statusTranslations: { [key: string]: string } = {
-    'open': 'Активен',
-    'preparing': 'Готовится',
-    'ready': 'Готов',
-    'served': 'Подано',
-    'closed': 'Завершен',
-    'cancelled': 'Отменен',
-    'pending': 'Ожидает'
-};
 
 export const ClientDashboard = ({ history, historyTab, setHistoryTab, onNewBooking, onLogout }: ClientDashboardProps) => (
     <Box>
@@ -89,8 +80,8 @@ export const ClientDashboard = ({ history, historyTab, setHistoryTab, onNewBooki
                                         <Typography fontWeight="bold">
                                             Заказ #{o.id} (Стол {o.table_number})
                                         </Typography>
-                                        <Chip 
-                                            label={statusTranslations[o.status] || o.status} 
+                                        <Chip
+                                            label={orderStatusLabel[o.status] || o.status}
                                             color={['open', 'preparing', 'ready', 'served'].includes(o.status) ? 'primary' : 'default'}
                                             size="small" 
                                         />

@@ -1,5 +1,7 @@
 import type { Context } from 'hono';
-import { query } from '../config/db.js';
+import { query, getPool } from '../config/db.js';
+import { getOrCreateClient } from '../utils/clientUtils.js';
+import { convertToStockUnit } from '../utils/unitConversion.js';
 
 export const getOrders = async (c: Context) => {
     const status = c.req.query('status'); // optional filter
@@ -13,7 +15,7 @@ export const getOrders = async (c: Context) => {
             LEFT JOIN clients c ON o.client_id = c.id
             LEFT JOIN order_items oi ON o.id = oi.order_id
             LEFT JOIN menu_items m ON oi.menu_item_id = m.id
-            WHERE 1=1
+            WHERE DATE(o.created_at) = CURRENT_DATE
         `;
         const params: any[] = [];
 
@@ -67,32 +69,34 @@ export const getActiveOrder = async (c: Context) => {
 };
 
 export const createOrder = async (c: Context) => {
-    const { tableId, items, phone } = await c.req.json(); // items: { menu_item_id, quantity, price }[]
+    let { tableId, items, phone, bookingId } = await c.req.json(); // items: { menu_item_id, quantity, price }[]
 
     try {
         // 1. Get or Create Client
         let clientId: number | null = null;
         if (phone) {
-            const clientRes = await query('SELECT id FROM clients WHERE phone = $1', [phone]);
-            if (clientRes.rows.length > 0) {
-                clientId = clientRes.rows[0].id;
-            } else {
-                const newClientRes = await query(
-                    'INSERT INTO clients (phone, first_name) VALUES ($1, $2) RETURNING id',
-                    [phone, 'Гость']
-                );
-                clientId = newClientRes.rows[0].id;
+            clientId = await getOrCreateClient(phone);
+        } else if (bookingId) {
+            // Link to booking's client directly
+            const bookingRes = await query('SELECT client_id FROM bookings WHERE id = $1', [bookingId]);
+            if (bookingRes.rows.length > 0) {
+                clientId = bookingRes.rows[0].client_id;
             }
         } else {
-            // Try to find client from active booking on this table
+            // Try to find client from active booking on this table today
             const bookingRes = await query(`
-                SELECT client_id FROM bookings 
-                WHERE table_id = $1 AND status = 'active' 
-                AND booking_date = CURRENT_DATE
+                SELECT b.client_id, b.id as booking_id FROM bookings b
+                JOIN booking_time_slots bts ON b.id = bts.booking_id
+                JOIN time_slots ts ON bts.time_slot_id = ts.id
+                WHERE b.table_id = $1 AND b.status = 'active' 
+                AND b.booking_date = CURRENT_DATE
+                AND ts.start_time <= CURRENT_TIME + interval '30 minutes'
+                ORDER BY ts.start_time ASC
                 LIMIT 1
             `, [tableId]);
             if (bookingRes.rows.length > 0) {
                 clientId = bookingRes.rows[0].client_id;
+                bookingId = bookingRes.rows[0].booking_id;
             }
         }
 
@@ -105,28 +109,104 @@ export const createOrder = async (c: Context) => {
             if (clientId) {
                 await query("UPDATE orders SET client_id = $1 WHERE id = $2 AND client_id IS NULL", [clientId, orderId]);
             }
+            if (bookingId) {
+                await query("UPDATE orders SET booking_id = $1 WHERE id = $2 AND booking_id IS NULL", [bookingId, orderId]);
+            }
         } else {
             const newOrderRes = await query(
-                "INSERT INTO orders (table_id, status, client_id, phone) VALUES ($1, 'open', $2, $3) RETURNING id", 
-                [tableId, clientId, phone || null]
+                "INSERT INTO orders (table_id, status, client_id, booking_id, phone) VALUES ($1, 'open', $2, $3, $4) RETURNING id", 
+                [tableId, clientId, bookingId || null, phone || null]
             );
             orderId = newOrderRes.rows[0].id;
         }
 
-        // Add items
-        for (const item of items) {
-            await query(
-                "INSERT INTO order_items (order_id, menu_item_id, quantity, price) VALUES ($1, $2, $3, $4)",
-                [orderId, item.menu_item_id, item.quantity, item.price]
-            );
-        }
+        // Validate stock availability
+        const pool = getPool();
+        const txClient = await pool.connect();
+        
+        try {
+            await txClient.query('BEGIN');
 
-        // Update total
-        await query(`
-            UPDATE orders
-            SET total = (SELECT COALESCE(SUM(quantity * price), 0) FROM order_items WHERE order_id = $1)
-            WHERE id = $1
-        `, [orderId]);
+            // Aggregate required ingredients for the whole order
+            const requiredIngredients: Record<number, number> = {};
+            for (const item of items as { menu_item_id: number; quantity: number; price: number }[]) {
+                const recipeRes = await txClient.query(
+                    `SELECT mii.ingredient_id, mii.quantity, mii.recipe_unit, i.unit as stock_unit, i.name as ingredient_name, i.current_stock
+                     FROM menu_item_ingredients mii
+                     JOIN ingredients i ON mii.ingredient_id = i.id
+                     WHERE mii.menu_item_id = $1`,
+                    [item.menu_item_id]
+                );
+                
+                for (const row of recipeRes.rows) {
+                    const deduct = convertToStockUnit(Number(row.quantity) * item.quantity, row.recipe_unit, row.stock_unit);
+                    if (requiredIngredients[row.ingredient_id] === undefined) {
+                        requiredIngredients[row.ingredient_id] = 0;
+                    }
+                    requiredIngredients[row.ingredient_id] = (requiredIngredients[row.ingredient_id] ?? 0) + deduct;
+                }
+            }
+
+            // Check against current stock
+            for (const ingredientId of Object.keys(requiredIngredients)) {
+                const id = Number(ingredientId);
+                const reqQty = requiredIngredients[id] ?? 0;
+                const stockRes = await txClient.query('SELECT name, current_stock FROM ingredients WHERE id = $1', [id]);
+                if (stockRes.rows.length > 0) {
+                    const stock = Number(stockRes.rows[0].current_stock);
+                    if (stock < reqQty) {
+                        await txClient.query('ROLLBACK');
+                        return c.json({ error: `Недостаточно ингредиента "${stockRes.rows[0].name}" на складе. Требуется: ${reqQty}, в наличии: ${stock}` }, 400);
+                    }
+                }
+            }
+
+            const values = items.flatMap((item: { menu_item_id: number; quantity: number; price: number }, i: number) => [
+                orderId, item.menu_item_id, item.quantity, item.price
+            ]);
+            const placeholders = items.map((_: unknown, i: number) =>
+                `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`
+            ).join(', ');
+            await txClient.query(
+                `INSERT INTO order_items (order_id, menu_item_id, quantity, price) VALUES ${placeholders}`,
+                values
+            );
+
+            // Auto stock deduction (with unit conversion: recipe_unit → stock_unit)
+            for (const item of items as { menu_item_id: number; quantity: number; price: number }[]) {
+                const recipeRes = await txClient.query(
+                    `SELECT mii.ingredient_id, mii.quantity, mii.recipe_unit, i.unit as stock_unit
+                     FROM menu_item_ingredients mii
+                     JOIN ingredients i ON mii.ingredient_id = i.id
+                     WHERE mii.menu_item_id = $1`,
+                    [item.menu_item_id]
+                );
+                for (const row of recipeRes.rows) {
+                    const deduct = convertToStockUnit(Number(row.quantity) * item.quantity, row.recipe_unit, row.stock_unit);
+                    await txClient.query(
+                        'UPDATE ingredients SET current_stock = GREATEST(0, current_stock - $1) WHERE id = $2',
+                        [deduct, row.ingredient_id]
+                    );
+                    await txClient.query(
+                        'INSERT INTO stock_movements (ingredient_id, type, quantity, order_id) VALUES ($1, $2, $3, $4)',
+                        [row.ingredient_id, 'usage', -deduct, orderId]
+                    );
+                }
+            }
+
+            await txClient.query(`
+                UPDATE orders
+                SET total = (SELECT COALESCE(SUM(quantity * price), 0) FROM order_items WHERE order_id = $1)
+                WHERE id = $1
+            `, [orderId]);
+
+            await txClient.query('COMMIT');
+        } catch (txErr) {
+            await txClient.query('ROLLBACK');
+            throw txErr;
+        } finally {
+            txClient.release();
+        }
 
         return c.json({ success: true, orderId });
     } catch (err) {

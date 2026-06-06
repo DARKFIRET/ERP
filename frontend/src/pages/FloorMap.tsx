@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, Typography, Paper, Grid, IconButton } from '@mui/material';
+import { Box, Typography, Paper, Grid, IconButton, Snackbar, Alert } from '@mui/material';
 import { RefreshCcw } from 'lucide-react';
 import type { TableData, CreateBookingPayload } from '../types';
 import { fetchTables, createBooking } from '../api';
@@ -12,9 +12,10 @@ const FloorMap = () => {
   const [selectedTable, setSelectedTable] = useState<TableData | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'info' });
 
   const loadTables = () => {
-    fetchTables().then(setTables).catch(console.error);
+    fetchTables().then(setTables).catch(() => {});
   };
 
   useEffect(() => {
@@ -26,8 +27,7 @@ const FloorMap = () => {
       setSelectedTable(table);
       setIsBookingFormOpen(true);
     } else {
-      // Use a snackbar or toast in real app, alert for now is consistent with existing code
-      alert(`Стол ${table.number} ${table.status === 'occupied' ? 'занят' : 'грязный'}`);
+      setSnackbar({ open: true, message: `Стол ${table.number} ${table.status === 'occupied' ? 'занят' : 'грязный'}`, severity: 'info' });
     }
   };
 
@@ -43,17 +43,19 @@ const FloorMap = () => {
       setSelectedTable(null);
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
-      console.error('Failed to create booking:', error);
-      alert('Ошибка при создании брони');
+      setSnackbar({ open: true, message: 'Ошибка при создании брони', severity: 'error' });
     }
   };
 
   return (
     <Box sx={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', p: { xs: 1, md: 3 } }}>
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+      </Snackbar>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h4" fontWeight="bold">Управление залом</Typography>
         <IconButton onClick={() => setRefreshTrigger(p => p + 1)} color="primary">
-            <RefreshCcw />
+          <RefreshCcw />
         </IconButton>
       </Box>
 
@@ -65,7 +67,7 @@ const FloorMap = () => {
             variant="outlined"
             sx={{
               flexGrow: 1,
-              bgcolor: '#f8f9fa',
+              bgcolor: 'background.default',
               borderRadius: 2,
               p: 2,
               overflow: 'hidden',
@@ -83,11 +85,12 @@ const FloorMap = () => {
                 overflowY: 'auto',
                 display: 'grid',
                 gridTemplateColumns: {
-                  xs: 'repeat(2, 1fr)',
-                  sm: 'repeat(3, 1fr)',
-                  md: 'repeat(4, 1fr)'
+                  xs: 'repeat(1, 1fr)',
+                  sm: 'repeat(2, 1fr)',
+                  md: 'repeat(3, 1fr)',
+                  lg: 'repeat(4, 1fr)'
                 },
-                gap: { xs: 2, sm: 3, md: 4 },
+                gap: { xs: 2, sm: 4, md: 4 },
                 p: { xs: 3, md: 5 }, // Increased padding (from 1 to 5 on md)
                 alignContent: 'flex-start'
               }}
@@ -105,21 +108,21 @@ const FloorMap = () => {
 
         {/* Right Column: Booking List */}
         <Grid item xs={12} md={4} lg={3} sx={{ height: { xs: '50%', md: '100%' } }}>
-          <Paper 
-            elevation={0} 
-            variant="outlined" 
-            sx={{ 
-                height: '100%', 
-                borderRadius: 2, 
-                overflow: 'hidden',
-                border: '1px solid', 
-                borderColor: 'divider' 
+          <Paper
+            elevation={0}
+            variant="outlined"
+            sx={{
+              height: '100%',
+              borderRadius: 2,
+              overflow: 'hidden',
+              border: '1px solid',
+              borderColor: 'divider'
             }}
           >
             <BookingList
-                refreshTrigger={refreshTrigger}
-                onAddBooking={handleAddBookingClick}
-                onRefresh={loadTables}
+              refreshTrigger={refreshTrigger}
+              onAddBooking={handleAddBookingClick}
+              onRefresh={loadTables}
             />
           </Paper>
         </Grid>

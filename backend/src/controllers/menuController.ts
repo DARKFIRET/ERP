@@ -13,11 +13,11 @@ export const getMenu = async (c: Context) => {
 export const createMenuItem = async (c: Context) => {
     const { name, price, category, image_url } = await c.req.json();
     try {
-        await query(
-            'INSERT INTO menu_items (name, price, category, image_url) VALUES ($1, $2, $3, $4)',
+        const res = await query(
+            'INSERT INTO menu_items (name, price, category, image_url) VALUES ($1, $2, $3, $4) RETURNING id',
             [name, price, category, image_url || null]
         );
-        return c.json({ success: true }, 201);
+        return c.json({ success: true, id: res.rows[0].id }, 201);
     } catch (err) {
         console.error('Error adding menu item:', err);
         return c.json({ error: 'Failed to add menu item' }, 500);

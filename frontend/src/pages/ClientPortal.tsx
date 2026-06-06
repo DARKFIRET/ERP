@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Container, Typography, Box, Snackbar, Alert, CircularProgress } from '@mui/material';
-import { fetchTables, fetchTimeSlots, fetchBookings, createBooking, fetchMenu, createOrder, fetchClientHistory } from '../api';
-import type { TableData, TimeSlot, BookingData, MenuItemData } from '../types';
+import { fetchTables, fetchTimeSlots, fetchBookings, createBooking, fetchMenu, createOrder, fetchClientHistory, sendOtp, fetchMenuAvailability } from '../api';
+import type { TableData, TimeSlot, BookingData, MenuItemData, MenuAvailability } from '../types';
 
 // Import split components
 import { ClientLogin } from '../components/ClientLogin';
 import { ClientDashboard } from '../components/ClientDashboard';
 import { ClientBooking } from '../components/ClientBooking';
 import { ClientOrdering } from '../components/ClientOrdering';
+import { OtpDialog } from '../components/OtpDialog';
 
 export default function ClientPortal() {
     const [view, setView] = useState<'login' | 'dashboard' | 'booking' | 'ordering'>('login');
@@ -17,9 +18,13 @@ export default function ClientPortal() {
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [bookings, setBookings] = useState<BookingData[]>([]);
     const [menu, setMenu] = useState<MenuItemData[]>([]);
+    const [availability, setAvailability] = useState<MenuAvailability>({});
     const [loading, setLoading] = useState(true);
     const [history, setHistory] = useState<{ guestName: string, bookings: any[], orders: any[] }>({ guestName: '', bookings: [], orders: [] });
     const [historyTab, setHistoryTab] = useState(0);
+
+    const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+    const [pendingPhone, setPendingPhone] = useState('');
 
     const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
     const [pax, setPax] = useState(2);
@@ -42,13 +47,14 @@ export default function ClientPortal() {
 
     const loadInitialData = async () => {
         try {
-            const [tablesData, slotsData, bookingsData, menuData] = await Promise.all([
-                fetchTables(), fetchTimeSlots(), fetchBookings(), fetchMenu()
+            const [tablesData, slotsData, bookingsData, menuData, availabilityData] = await Promise.all([
+                fetchTables(), fetchTimeSlots(), fetchBookings(), fetchMenu(), fetchMenuAvailability()
             ]);
             setTables(tablesData);
             setTimeSlots(slotsData);
             setBookings(bookingsData);
             setMenu(menuData);
+            setAvailability(availabilityData);
         } catch (error) {
             showNotification("Ошибка загрузки данных", "error");
         } finally {
@@ -69,13 +75,24 @@ export default function ClientPortal() {
         }
     };
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
         if (phone.replace(/\D/g, '').length < 11) {
             showNotification("Введите полный номер телефона", "error");
             return;
         }
-        localStorage.setItem('client_phone', phone);
-        loadClientHistory(phone);
+        try {
+            await sendOtp(phone);
+            setPendingPhone(phone);
+            setOtpDialogOpen(true);
+        } catch {
+            showNotification("Не удалось отправить код. Попробуйте позже", "error");
+        }
+    };
+
+    const handleOtpVerified = () => {
+        setOtpDialogOpen(false);
+        localStorage.setItem('client_phone', pendingPhone);
+        loadClientHistory(pendingPhone);
         setView('dashboard');
     };
 
@@ -180,10 +197,17 @@ export default function ClientPortal() {
             {view === 'ordering' && (
                 <ClientOrdering
                     menu={menu} cart={cart} addToCart={addToCart} removeFromCart={removeFromCart}
-                    getCartTotal={getCartTotal} onSubmit={handleOrderSubmit}
+                    getCartTotal={getCartTotal} onSubmit={handleOrderSubmit} availability={availability}
                     onSkip={() => { showNotification("Ждем вас в гости!", "success"); setTimeout(() => { loadClientHistory(phone); setView('dashboard'); }, 2000); }}
                 />
             )}
+
+            <OtpDialog
+                open={otpDialogOpen}
+                phone={pendingPhone}
+                onVerified={handleOtpVerified}
+                onClose={() => setOtpDialogOpen(false)}
+            />
 
             <Snackbar open={notification.open} autoHideDuration={6000} onClose={() => setNotification({ ...notification, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert severity={notification.severity} sx={{ width: '100%' }}>{notification.message}</Alert>

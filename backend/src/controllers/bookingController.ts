@@ -1,5 +1,6 @@
 import type { Context } from 'hono';
 import { query } from '../config/db.js';
+import { getOrCreateClient } from '../utils/clientUtils.js';
 
 export const getTimeSlots = async (c: Context) => {
   try {
@@ -19,20 +20,7 @@ export const createBooking = async (c: Context) => {
 
   try {
     // 1. Get or Create Client
-    let clientId: number;
-    const clientRes = await query('SELECT id FROM clients WHERE phone = $1', [phone]);
-    
-    if (clientRes.rows.length > 0) {
-        clientId = clientRes.rows[0].id;
-        // Optionally update name if provided and was empty
-        await query('UPDATE clients SET first_name = COALESCE(first_name, $1) WHERE id = $2', [guestName, clientId]);
-    } else {
-        const newClientRes = await query(
-            'INSERT INTO clients (phone, first_name) VALUES ($1, $2) RETURNING id',
-            [phone, guestName]
-        );
-        clientId = newClientRes.rows[0].id;
-    }
+    const clientId = await getOrCreateClient(phone, guestName);
 
     // 2. Check Overlap
     const overlapRes = await query(`

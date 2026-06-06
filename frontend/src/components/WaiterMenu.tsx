@@ -1,37 +1,46 @@
-import { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Button, Grid, Card, CardContent, CardMedia, Chip, TextField, IconButton, useTheme, useMediaQuery, Badge, Fab, Drawer } from '@mui/material';
+import { useState, useEffect, useMemo } from 'react';
+import { Box, Typography, Paper, Button, Grid, Card, CardContent, CardMedia, Chip, TextField, IconButton, useTheme, useMediaQuery, Badge, Fab, Drawer, Snackbar, Alert, Tooltip } from '@mui/material';
 import { Plus, Minus, ShoppingCart, ImageOff, ArrowLeft, X } from 'lucide-react';
-import type { MenuItemData, OrderData } from '../types';
-import { fetchMenu, fetchActiveOrder, createOrder } from '../api';
+import type { MenuItemData, OrderData, MenuAvailability } from '../types';
+import { fetchMenu, fetchActiveOrder, createOrder, fetchMenuAvailability } from '../api';
 
 interface WaiterMenuProps {
   tableId: number;
+  bookingId?: number | null;
   onBack: () => void;
 }
 
-const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
+const WaiterMenu = ({ tableId, bookingId, onBack }: WaiterMenuProps) => {
   const [menuItems, setMenuItems] = useState<MenuItemData[]>([]);
   const [cart, setCart] = useState<{ [key: number]: number }>({});
   const [activeOrder, setActiveOrder] = useState<OrderData | null>(null);
+  const [availability, setAvailability] = useState<MenuAvailability>({});
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('Все');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'error' });
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
-    fetchMenu().then(setMenuItems).catch(console.error);
-    fetchActiveOrder(tableId).then(setActiveOrder).catch(console.error);
+    fetchMenu().then(setMenuItems).catch(() => {
+      setSnackbar({ open: true, message: 'Ошибка загрузки меню', severity: 'error' });
+    });
+    fetchActiveOrder(tableId).then(setActiveOrder).catch(() => {});
+    fetchMenuAvailability().then(setAvailability).catch(() => {});
   }, [tableId]);
 
-  const categories = ['Все', ...new Set(menuItems.map(i => i.category).filter(Boolean))];
+  const categories = useMemo(
+    () => ['Все', ...new Set(menuItems.map(i => i.category).filter(Boolean))],
+    [menuItems]
+  );
 
-  const filteredItems = menuItems.filter(item => {
+  const filteredItems = useMemo(() => menuItems.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = categoryFilter === 'Все' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
-  });
+  }), [menuItems, search, categoryFilter]);
 
   const addToCart = (itemId: number) => {
     setCart(prev => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
@@ -61,22 +70,25 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
     if (itemsToOrder.length === 0) return;
 
     try {
-        await createOrder(tableId, itemsToOrder);
-        // In a real app, show a snackbar here
+        await createOrder(tableId, itemsToOrder, undefined, bookingId);
         setCart({});
         fetchActiveOrder(tableId).then(setActiveOrder);
         if (isMobile) setIsCartOpen(false);
+        setSnackbar({ open: true, message: 'Заказ успешно отправлен!', severity: 'success' });
     } catch (e) {
-        alert('Ошибка при отправке заказа');
+        setSnackbar({ open: true, message: 'Ошибка при отправке заказа', severity: 'error' });
     }
   };
 
-  const cartTotal = Object.entries(cart).reduce((sum, [id, qty]) => {
+  const cartTotal = useMemo(() =>
+    Object.entries(cart).reduce((sum, [id, qty]) => {
       const item = menuItems.find(i => i.id === Number(id));
       return sum + (item ? item.price * qty : 0);
-  }, 0);
+    }, 0),
+    [cart, menuItems]
+  );
 
-  const cartItemCount = Object.values(cart).reduce((a, b) => a + b, 0);
+  const cartItemCount = useMemo(() => Object.values(cart).reduce((a, b) => a + b, 0), [cart]);
 
   const CartContent = () => (
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', p: 2 }}>
@@ -106,7 +118,7 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
                                 <Typography variant="body2" fontWeight="500" noWrap>{item.name}</Typography>
                                 <Typography variant="caption" color="text.secondary">{item.price} ₽</Typography>
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, bgcolor: 'white', borderRadius: 1, px: 0.5 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 0.5 }}>
                                 <IconButton size="small" onClick={() => removeFromCart(item.id)}><Minus size={14} /></IconButton>
                                 <Typography variant="body2" fontWeight="bold">{qty}</Typography>
                                 <IconButton size="small" onClick={() => addToCart(item.id)}><Plus size={14} /></IconButton>
@@ -135,7 +147,7 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
         </Box>
 
         {activeOrder && (
-            <Box sx={{ mt: 3, pt: 2, borderTop: '2px dashed #ccc' }}>
+            <Box sx={{ mt: 3, pt: 2, borderTop: '2px dashed', borderColor: 'divider' }}>
                 <Typography variant="subtitle2" gutterBottom color="text.secondary">Активный заказ:</Typography>
                 <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
                     {activeOrder.items?.map((item, idx) => (
@@ -159,6 +171,9 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar(s => ({ ...s, open: false }))} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+      </Snackbar>
       {/* Header */}
       <Box sx={{ p: 2, pb: 0, display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0 }}>
         <Button onClick={onBack} startIcon={<ArrowLeft size={18} />} sx={{ minWidth: 'auto', px: 1 }}>
@@ -197,37 +212,40 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
             <Grid container spacing={2}>
                 {filteredItems.map(item => (
                     <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
-                        <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 } }}>
-                            {item.image_url ? (
-                                <CardMedia
-                                    component="img"
-                                    height="160"
-                                    image={item.image_url}
-                                    alt={item.name}
-                                />
-                            ) : (
-                                <Box sx={{ height: 160, bgcolor: 'grey.100', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <ImageOff size={32} color="#bdbdbd" />
-                                </Box>
-                            )}
-                            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2 }}>
-                                <Typography variant="subtitle1" fontWeight="bold" noWrap title={item.name} gutterBottom>{item.name}</Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block', lineHeight: 1.2 }}>{item.category}</Typography>
-
-                                <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="h6" color="primary.main" fontWeight="bold">{item.price} ₽</Typography>
-                                    <Button
-                                        size="small"
-                                        variant="contained"
-                                        disableElevation
-                                        onClick={() => addToCart(item.id)}
-                                        sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}
-                                    >
-                                        <Plus size={18} />
-                                    </Button>
-                                </Box>
-                            </CardContent>
-                        </Card>
+                        {(() => {
+                            const avail = availability[item.id];
+                            const canOrder = avail === undefined || avail.can_order;
+                            const portions = avail?.portions_available ?? null;
+                            return (
+                                <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 3, overflow: 'hidden', transition: 'all 0.2s', '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }, opacity: canOrder ? 1 : 0.7 }}>
+                                    {item.image_url ? (
+                                        <CardMedia component="img" height="160" image={item.image_url} alt={item.name} />
+                                    ) : (
+                                        <Box sx={{ height: 160, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.disabled' }}>
+                                            <ImageOff size={32} />
+                                        </Box>
+                                    )}
+                                    <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', p: 2 }}>
+                                        <Typography variant="subtitle1" fontWeight="bold" noWrap title={item.name} gutterBottom>{item.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block', lineHeight: 1.2 }}>{item.category}</Typography>
+                                        {!canOrder && <Chip label="Нет в наличии" color="error" size="small" sx={{ mb: 1, alignSelf: 'flex-start' }} />}
+                                        {canOrder && portions !== null && portions <= 3 && (
+                                            <Chip label={`Осталось: ${portions} порц.`} color="warning" size="small" sx={{ mb: 1, alignSelf: 'flex-start' }} />
+                                        )}
+                                        <Box sx={{ mt: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="h6" color="primary.main" fontWeight="bold">{item.price} ₽</Typography>
+                                            <Tooltip title={canOrder ? '' : 'Недостаточно ингредиентов'} disableHoverListener={canOrder}>
+                                                <span>
+                                                    <Button size="small" variant="contained" disableElevation disabled={!canOrder} onClick={() => addToCart(item.id)} sx={{ minWidth: 'auto', px: 2, borderRadius: 2 }}>
+                                                        <Plus size={18} />
+                                                    </Button>
+                                                </span>
+                                            </Tooltip>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
                     </Grid>
                 ))}
             </Grid>
@@ -240,7 +258,7 @@ const WaiterMenu = ({ tableId, onBack }: WaiterMenuProps) => {
 
         {/* Desktop Cart */}
         {!isMobile && (
-            <Paper elevation={0} variant="outlined" sx={{ width: 340, display: 'flex', flexDirection: 'column', borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: '#fafafa' }}>
+            <Paper elevation={0} variant="outlined" sx={{ width: 340, display: 'flex', flexDirection: 'column', borderRadius: 3, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
                 <CartContent />
             </Paper>
         )}

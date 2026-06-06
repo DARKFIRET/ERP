@@ -1,6 +1,6 @@
 import { Box, Typography, IconButton, Divider, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Button, FormHelperText, Card, CardContent } from '@mui/material';
 import { ArrowLeft as ArrowLeftIcon } from 'lucide-react';
-import { TextMaskCustom } from './ClientLogin';
+import TextMaskCustom from './TextMaskCustom';
 import type { TableData, TimeSlot } from '../types';
 
 interface ClientBookingProps {

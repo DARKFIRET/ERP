@@ -1,1 +1,0 @@
-{"version":3,"file":"clientRoutes.js","sourceRoot":"","sources":["clientRoutes.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,IAAI,EAAE,MAAM,MAAM,CAAC;AAC5B,OAAO,EAAE,gBAAgB,EAAE,MAAM,oCAAoC,CAAC;AAEtE,MAAM,YAAY,GAAG,IAAI,IAAI,EAAE,CAAC;AAEhC,YAAY,CAAC,GAAG,CAAC,UAAU,EAAE,gBAAgB,CAAC,CAAC;AAE/C,eAAe,YAAY,CAAC"}

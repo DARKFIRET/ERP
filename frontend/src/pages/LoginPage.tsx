@@ -14,7 +14,7 @@ const LoginPage = () => {
         e.preventDefault();
         setError(null);
         try {
-            const res = await fetch('http://localhost:3000/login', {
+            const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -36,8 +36,7 @@ const LoginPage = () => {
                 case 'manager': navigate('/management'); break;
                 default: navigate('/');
             }
-        } catch (err) {
-            console.error(err);
+        } catch {
             setError('Ошибка входа. Проверьте подключение к серверу.');
         }
     };

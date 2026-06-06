@@ -1,15 +1,70 @@
-version: '3.8'
 services:
   db:
     image: postgres:15
+    restart: unless-stopped
     environment:
       POSTGRES_USER: cafe
       POSTGRES_PASSWORD: cafe_password
       POSTGRES_DB: cafe_erp
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cafe -d cafe_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: 45blackfire54/ribay-backend:latest
+    restart: unless-stopped
+    environment:
+      - DB_USER=cafe
+      - DB_PASSWORD=cafe_password
+      - DB_HOST=db
+      - DB_NAME=cafe_erp
+      - DB_PORT=5432
+      - JWT_SECRET=change_me_in_production
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: 45blackfire54/ribay-frontend:latest
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    command:
+      - sh
+      - -c
+      - |
+        cat > /etc/caddy/Caddyfile << 'CADDYEOF'
+        oo7.fun {
+            @api path /api/* /storage/*
+            handle @api {
+                reverse_proxy backend:3000
+            }
+            handle {
+                reverse_proxy frontend:80
+            }
+        }
+        CADDYEOF
+        caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    depends_on:
+      - backend
+      - frontend
 
 volumes:
   pgdata:
+  storage:
+  caddy_data:
+  caddy_config:

@@ -1,9 +1,9 @@
-import { useState, useEffect, forwardRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Select, MenuItem, FormControl, InputLabel, FormHelperText, Typography, ToggleButton, ToggleButtonGroup, Grid, InputAdornment } from '@mui/material';
-import { IMaskInput } from 'react-imask';
 import { User, Phone, Calendar, Users, Table as TableIcon, Clock } from 'lucide-react';
 import type { CreateBookingPayload, TableData, BookingData, TimeSlot } from '../types';
 import { fetchBookings, fetchTimeSlots } from '../api';
+import TextMaskCustom from './TextMaskCustom';
 
 interface BookingFormProps {
   open: boolean;
@@ -12,29 +12,6 @@ interface BookingFormProps {
   tableId: number | null;
   tables?: TableData[];
 }
-
-interface CustomProps {
-  onChange: (event: { target: { name: string; value: string } }) => void;
-  name: string;
-}
-
-const TextMaskCustom = forwardRef<HTMLElement, CustomProps>(
-  function TextMaskCustom(props, ref) {
-    const { onChange, ...other } = props;
-    return (
-      <IMaskInput
-        {...other}
-        mask="+7 (000) 000-00-00"
-        definitions={{
-          '#': /[1-9]/,
-        }}
-        inputRef={ref as any}
-        onAccept={(value: any) => onChange({ target: { name: props.name, value } })}
-        overwrite
-      />
-    );
-  },
-);
 
 const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingFormProps) => {
   const [name, setName] = useState('');
@@ -76,8 +53,8 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
 
       Promise.all([fetchBookings(), fetchTimeSlots()])
         .then(([bookings, slots]) => {
-            setExistingBookings(bookings);
-            setAllTimeSlots(slots);
+          setExistingBookings(bookings);
+          setAllTimeSlots(slots);
         })
         .catch(console.error);
     }
@@ -88,11 +65,11 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
     if (!selectedDate || !selectedTableId) return false;
 
     return existingBookings.some(booking => {
-        if (booking.table_id !== selectedTableId) return false;
-        if (booking.booking_date !== selectedDate) return false;
+      if (booking.table_id !== selectedTableId) return false;
+      if (booking.booking_date !== selectedDate) return false;
 
-        // Check if this booking includes the slotId
-        return booking.slots.some(s => s.id === slotId);
+      // Check if this booking includes the slotId
+      return booking.slots.some(s => s.id === slotId);
     });
   };
 
@@ -111,38 +88,38 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
 
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length < 11) {
-       newErrors.phone = 'Введите полный номер телефона';
-       isValid = false;
+      newErrors.phone = 'Введите полный номер телефона';
+      isValid = false;
     }
 
     if (pax < 1) {
-        newErrors.pax = 'Минимум 1 гость';
-        isValid = false;
+      newErrors.pax = 'Минимум 1 гость';
+      isValid = false;
     } else if (pax > 4) {
-        newErrors.pax = 'Максимум 4 гостя';
-        isValid = false;
+      newErrors.pax = 'Максимум 4 гостя';
+      isValid = false;
     }
 
     if (!selectedTableId) {
-        newErrors.table = 'Выберите стол';
-        isValid = false;
+      newErrors.table = 'Выберите стол';
+      isValid = false;
     }
 
     if (selectedSlotIds.length === 0) {
-        newErrors.slot = 'Выберите хотя бы один слот';
-        isValid = false;
+      newErrors.slot = 'Выберите хотя бы один слот';
+      isValid = false;
     } else {
-        // Check continuity if strictly required, user said "can select multiple checkpoints"
-        // Usually contiguous makes sense for a single order.
-        // Let's enforce contiguous logic based on IDs assuming they are sequential in DB.
-        const sortedIds = [...selectedSlotIds].sort((a, b) => a - b);
-        for (let i = 0; i < sortedIds.length - 1; i++) {
-            if (sortedIds[i + 1] !== sortedIds[i] + 1) {
-                 newErrors.slot = 'Слоты должны идти подряд';
-                 isValid = false;
-                 break;
-            }
+      // Check continuity if strictly required, user said "can select multiple checkpoints"
+      // Usually contiguous makes sense for a single order.
+      // Let's enforce contiguous logic based on IDs assuming they are sequential in DB.
+      const sortedIds = [...selectedSlotIds].sort((a, b) => a - b);
+      for (let i = 0; i < sortedIds.length - 1; i++) {
+        if (sortedIds[i + 1] !== sortedIds[i] + 1) {
+          newErrors.slot = 'Слоты должны идти подряд';
+          isValid = false;
+          break;
         }
+      }
     }
 
     setErrors(newErrors);
@@ -196,23 +173,23 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
-                label="Телефон *"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                onBlur={() => setTouched({ ...touched, phone: true })}
-                name="phone"
-                InputProps={{
-                    inputComponent: TextMaskCustom as any,
-                    startAdornment: <InputAdornment position="start"><Phone size={18} /></InputAdornment>,
-                }}
-                fullWidth
-                error={touched.phone && !!errors.phone}
-                helperText={touched.phone && errors.phone}
+              label="Телефон *"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setTouched({ ...touched, phone: true })}
+              name="phone"
+              InputProps={{
+                inputComponent: TextMaskCustom as any,
+                startAdornment: <InputAdornment position="start"><Phone size={18} /></InputAdornment>,
+              }}
+              fullWidth
+              error={touched.phone && !!errors.phone}
+              helperText={touched.phone && errors.phone}
             />
           </Grid>
 
           <Grid item xs={12} sm={6}>
-             <TextField
+            <TextField
               label="Дата *"
               type="date"
               fullWidth
@@ -225,7 +202,7 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-             <TextField
+            <TextField
               label="Гостей *"
               type="number"
               fullWidth
@@ -249,14 +226,14 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
                 label="Номер стола *"
                 onChange={(e) => setSelectedTableId(Number(e.target.value))}
                 onBlur={() => setTouched({ ...touched, table: true })}
-                startAdornment={<InputAdornment position="start" sx={{ ml: 1, mr: -1 }}><TableIcon size={18} /></InputAdornment>}
+                startAdornment={<InputAdornment position="start" sx={{ ml: 1, mr: 2 }}><TableIcon size={18} /></InputAdornment>}
               >
                 {tables.map((table) => (
                   <MenuItem key={table.id} value={table.id}>
                     Стол {table.number} ({table.seats} мест) - {
                       table.status === 'free' ? 'Свободен' :
-                      table.status === 'occupied' ? 'Занят' :
-                      table.status === 'reserved' ? 'Забронирован' : 'Грязный'
+                        table.status === 'occupied' ? 'Занят' :
+                          table.status === 'reserved' ? 'Забронирован' : 'Грязный'
                     }
                   </MenuItem>
                 ))}
@@ -272,39 +249,39 @@ const BookingForm = ({ open, onClose, onSubmit, tableId, tables = [] }: BookingF
                 <Clock size={16} /> Выберите время:
               </Typography>
               <ToggleButtonGroup
-                  value={selectedSlotIds}
-                  onChange={handleSlotChange}
-                  aria-label="time slots"
-                  sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}
+                value={selectedSlotIds}
+                onChange={handleSlotChange}
+                aria-label="time slots"
+                sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}
               >
-                  {allTimeSlots.map(slot => {
-                      const disabled = isSlotOccupied(slot.id);
-                      return (
-                          <ToggleButton
-                              key={slot.id}
-                              value={slot.id}
-                              disabled={disabled}
-                              sx={{
-                                  flex: '0 0 auto',
-                                  border: '1px solid rgba(0, 0, 0, 0.12) !important',
-                                  borderRadius: '4px !important',
-                                  px: 2,
-                                  py: 1,
-                                  bgcolor: disabled ? 'action.disabledBackground' : 'transparent',
-                                  '&.Mui-selected': {
-                                      bgcolor: 'primary.main',
-                                      color: 'white',
-                                      '&:hover': { bgcolor: 'primary.dark' }
-                                  }
-                              }}
-                          >
-                              {slot.start_time}
-                          </ToggleButton>
-                      );
-                  })}
+                {allTimeSlots.map(slot => {
+                  const disabled = isSlotOccupied(slot.id);
+                  return (
+                    <ToggleButton
+                      key={slot.id}
+                      value={slot.id}
+                      disabled={disabled}
+                      sx={{
+                        flex: '0 0 auto',
+                        border: '1px solid rgba(0, 0, 0, 0.12) !important',
+                        borderRadius: '4px !important',
+                        px: 2,
+                        py: 1,
+                        bgcolor: disabled ? 'action.disabledBackground' : 'transparent',
+                        '&.Mui-selected': {
+                          bgcolor: 'primary.main',
+                          color: 'white',
+                          '&:hover': { bgcolor: 'primary.dark' }
+                        }
+                      }}
+                    >
+                      {slot.start_time}
+                    </ToggleButton>
+                  );
+                })}
               </ToggleButtonGroup>
               {touched.slot && errors.slot && (
-                  <FormHelperText error>{errors.slot}</FormHelperText>
+                <FormHelperText error>{errors.slot}</FormHelperText>
               )}
             </Box>
           </Grid>

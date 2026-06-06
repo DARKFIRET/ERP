@@ -10,6 +10,12 @@ import {
   Grid,
   TextField,
   Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   useTheme,
   CircularProgress,
 } from "@mui/material";
@@ -17,6 +23,7 @@ import {
   ComposedChart,
   Line,
   Bar,
+  BarChart,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -33,7 +40,8 @@ import {
   parseISO,
 } from "date-fns";
 import { ru } from "date-fns/locale";
-import { fetchStatistics } from "../api";
+import { fetchStatistics, fetchMargins } from "../api";
+import type { MarginItem } from "../types";
 
 type FilterType = "week" | "month" | "quarter" | "year" | "custom";
 
@@ -53,6 +61,7 @@ const Statistics = () => {
   const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [margins, setMargins] = useState<{ by_item: MarginItem[]; by_category: { category: string; revenue: number; total_cost: number; margin_pct: number }[]; total: { revenue: number; total_cost: number; margin_pct: number } } | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -82,15 +91,13 @@ const Statistics = () => {
   useEffect(() => {
     if (startDate && endDate) {
         setLoading(true);
-        fetchStatistics(startDate, endDate)
-            .then(res => {
-                setData(res);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("Failed to fetch stats", err);
-                setLoading(false);
-            });
+        Promise.all([
+            fetchStatistics(startDate, endDate),
+            fetchMargins(startDate, endDate)
+        ]).then(([stats, marginsData]) => {
+            setData(stats);
+            setMargins(marginsData);
+        }).catch(() => {}).finally(() => setLoading(false));
     }
   }, [startDate, endDate]);
 
@@ -246,15 +253,7 @@ const Statistics = () => {
             </Grid>
           </Grid>
 
-          <Card
-            elevation={0}
-            sx={{
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 2,
-              p: 3,
-            }}
-          >
+          <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 3, mb: 4 }}>
             <Typography variant="h6" gutterBottom mb={3}>
               График показателей
             </Typography>
@@ -292,7 +291,9 @@ const Statistics = () => {
                       <Tooltip
                         contentStyle={{
                           borderRadius: 8,
-                          border: "1px solid #e0e0e0",
+                          border: `1px solid ${theme.palette.divider}`,
+                          backgroundColor: theme.palette.background.paper,
+                          color: theme.palette.text.primary,
                           boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
                         }}
                         formatter={(value: any, name: any) => {
@@ -342,6 +343,105 @@ const Statistics = () => {
               )}
             </Box>
           </Card>
+          {/* Margins section */}
+          {margins && (
+            <>
+              <Typography variant="h5" fontWeight="bold" gutterBottom mt={4} mb={2}>Маржа</Typography>
+
+              {/* Margin summary cards */}
+              <Grid container spacing={3} mb={4}>
+                <Grid item xs={12} sm={4}>
+                  <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Выручка</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="primary.main">
+                      {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(margins.total.revenue)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Себестоимость</Typography>
+                    <Typography variant="h5" fontWeight="bold" color="error.main">
+                      {new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(margins.total.total_cost)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Чистая маржа</Typography>
+                    <Typography variant="h5" fontWeight="bold" color={margins.total.margin_pct >= 40 ? 'success.main' : margins.total.margin_pct >= 20 ? 'warning.main' : 'error.main'}>
+                      {margins.total.margin_pct.toFixed(1)}%
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Stacked bar chart by category */}
+              {margins.by_category.length > 0 && (
+                <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3, mb: 4 }}>
+                  <Typography variant="h6" gutterBottom mb={3}>Выручка vs Себестоимость по категориям</Typography>
+                  <Box sx={{ width: '100%', height: 320 }}>
+                    <ResponsiveContainer>
+                      <BarChart data={margins.by_category} margin={{ top: 10, right: 20, bottom: 20, left: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.palette.divider} />
+                        <XAxis dataKey="category" fontSize={12} />
+                        <YAxis tickFormatter={v => `${(v/1000).toFixed(0)}k`} fontSize={12} />
+                        <Tooltip formatter={(v: number | undefined) => v !== undefined ? new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' }).format(v) : ''} />
+                        <Legend />
+                        <Bar dataKey="total_cost" name="Себестоимость" stackId="a" fill={theme.palette.error.light} />
+                        <Bar dataKey="revenue" name="Выручка" stackId="b" fill={theme.palette.primary.main} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Card>
+              )}
+
+              {/* Margin table by item */}
+              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                  <Typography variant="h6">Маржа по блюдам</Typography>
+                </Box>
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: 'background.default' }}>
+                      <TableRow>
+                        <TableCell>Блюдо</TableCell>
+                        <TableCell>Категория</TableCell>
+                        <TableCell align="right">Продано</TableCell>
+                        <TableCell align="right">Выручка ₽</TableCell>
+                        <TableCell align="right">Себест. ₽</TableCell>
+                        <TableCell align="right">Маржа ₽</TableCell>
+                        <TableCell align="right">Маржа %</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {margins.by_item.map((item, idx) => (
+                        <TableRow key={idx} hover sx={{
+                          bgcolor: item.margin_pct < 20 ? 'error.50' : item.margin_pct > 60 ? 'success.50' : 'inherit'
+                        }}>
+                          <TableCell sx={{ fontWeight: 500 }}>{item.name}</TableCell>
+                          <TableCell>{item.category}</TableCell>
+                          <TableCell align="right">{item.sold}</TableCell>
+                          <TableCell align="right">{item.revenue.toFixed(0)}</TableCell>
+                          <TableCell align="right">{item.total_cost.toFixed(0)}</TableCell>
+                          <TableCell align="right">{item.margin_rub.toFixed(0)}</TableCell>
+                          <TableCell align="right" sx={{
+                            fontWeight: 'bold',
+                            color: item.margin_pct < 20 ? 'error.main' : item.margin_pct > 60 ? 'success.main' : 'warning.main'
+                          }}>
+                            {item.margin_pct.toFixed(1)}%
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {margins.by_item.length === 0 && (
+                        <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>Нет данных</TableCell></TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Card>
+            </>
+          )}
         </>
       )}
     </Box>
